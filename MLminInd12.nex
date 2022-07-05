@@ -40,7 +40,7 @@ MATRIX
 END;
 
 BEGIN PAUP;
-outgroup xxxxxx; #add outgroup identification here
+outgroup xxxxxx; ####add outgroup identification here
 lset rates=gamma nst=6 rmatrix=estimate pinvar=estimate; #this sets up GTR model, pinvar=estimate means to estimate invariate sites
 lscores 1; #also required for GTR model
 log start file=ML.log;
