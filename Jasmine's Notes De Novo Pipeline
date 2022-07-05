@@ -1,0 +1,324 @@
+#Jasmine's notes from the first pass of Misha Matz's de novo pipeline
+
+#the pipeline calls for a minInd value of at least 70-85% of your samples, but this is written for intraspecific data and we have interspecific
+# instead we will work with a much lower number because we are dealing with individuals from different species so it doesn't throw away so many SNPs
+# adapted from Misha Matz's pipeline https://github.com/z0on/2bRAD_denovo/blob/master/2bRAD_README.sh
+# also edited by Hannah Aichelman, Isabel Novick, Evan Kristiansen, and Jasmine Alqassar
+
+#Starting from "population structure" section
+# At the end we should have a BCF file (the binary form of a VCF)
+
+module load ANGSD
+#--------------- population structure example from Misha Matz's pipeline
+
+# Note: PCA and Admixture are not supposed to be run on data that contain clones or genotyping replicates. For PCA, these can be removed without rerunning ANGSD from the IBS distance matrix; but for ngsAdmix ANGSD must be rerun.
+
+# Generating genotype likelihoods from highly confident (non-sequencing-error) SNPs
+# set minInd to 75-80% of your total number of bams
+# if you expect very highly differentiated populations with nearly fixed alternative alleles, remove '-hwe_pval 1e-5' form FILTERS
+# -doGeno 8 : genotype likelihood format setting for ngsLD; if you want to run PCA, use -doGeno 32 (but I recommend using ibsMat for all ordination work)
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 20 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -skipTriallelic 1 -minInd 1000 -snp_pval 1e-5 -minMaf 0.05"
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doVcf 1 -doPost 1 -doGlf 2"
+
+# Starting angsd with -P the number of parallel processes. Funny but in many cases angsd runs faster on -P 1
+angsd -b bams -GL 1 $FILTERS $TODO -P 1 -out myresult
+
+# how many SNPs?
+NSITES=`zcat myresult.mafs.gz | wc -l`
+echo $NSITES
+############################################################################################################################################################################################################################################
+
+#What Isabel and I tried- includes her notes and mine
+module load ANGSD
+
+#First pass with new bams. Adding -hwe_pval 1e-5 to see what it does, although I think we have highly differentiated pops
+
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 20 -minQ 25 -dosnpstat 1 -doHWE 1 -hwe_pval 1e-5 -sb_pval 1e-5 -hetbias_pval 1e-5 -skipTriallelic 1 -minInd 25 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doVcf 1 -doPost 1 -doGlf 2"
+
+# Starting angsd with -P the number of parallel processes. Funny but in many cases angsd runs faster on -P 1
+angsd -b bams -GL 1 $FILTERS $TODO -P 1 -out myresult_default
+
+#"doVCF is deprecated, use doBCF instead" is the error we got for this and also for the first time we ran BOWTIE2, so we insert doBcf instead
+
+#This is output myresult_default
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 20 -minQ 25 -dosnpstat 1 -doHWE 1 -hwe_pval 1e-5 -sb_pval 1e-5 -hetbias_pval 1e-5 -skipTriallelic 1 -minInd 25 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams -GL 1 $FILTERS $TODO -P 1 -out myresult_default
+
+# how many SNPs?
+NSITES=`zcat myresult_default.mafs.gz | wc -l`
+echo $NSITES
+
+### SNPs= 223
+
+#Now we are going to get rid of '-hwe_pval 1e-5', called myresult_noHWE_pval
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 20 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -skipTriallelic 1 -minInd 25 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams -GL 1 $FILTERS $TODO -P 1 -out myresult_noHWE_pval
+
+# how many SNPs?
+NSITES=`zcat myresult_noHWE_pval.mafs.gz | wc -l`
+echo $NSITES
+
+### SNPs=261
+
+#Now we are going to get rid of skiptriallelic, myresult_no_skiptri
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 20 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 25 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams -GL 1 $FILTERS $TODO -P 1 -out myresult_no_skiptri
+
+# how many SNPs?
+NSITES=`zcat myresult_no_skiptri.mafs.gz | wc -l`
+echo $NSITES
+
+#261
+
+#Now we are going to get keep skiptriallelic removed and reduce the minInd to 75% which is 24 individuals
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 20 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 24 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams -GL 1 $FILTERS $TODO -P 1 -out myresult_minInd24
+
+# how many SNPs?
+NSITES=`zcat myresult_minInd24.mafs.gz | wc -l`
+echo $NSITES
+
+#359
+
+#Now we are going to get keep skiptriallelic removed and keep the minInd to 80% which is 25 individuals. We are also changing minQ score to 30. myresult_minQ30
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 20 -minQ 30 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 25 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams -GL 1 $FILTERS $TODO -P 1 -out myresult_minQ30
+
+# how many SNPs?
+NSITES=`zcat myresult_minQ30.mafs.gz | wc -l`
+echo $NSITES
+
+#257
+
+#Now we are going to get keep skiptriallelic removed and keep the minInd to 80% which is 25 individuals. We are also changing minQ score to 20. myresult_minQ20
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 20 -minQ 20 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 25 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams -GL 1 $FILTERS $TODO -P 1 -out myresult_minQ20
+
+# how many SNPs?
+NSITES=`zcat myresult_minQ20.mafs.gz | wc -l`
+echo $NSITES
+
+#261
+
+#Now we are going to get keep skiptriallelic removed and keep the minInd to 80% which is 25 individuals. We are also changing minMapQ to 10
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 10 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 25 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams -GL 1 $FILTERS $TODO -P 1 -out myresult_minMapQ10
+
+# how many SNPs?
+NSITES=`zcat myresult_minMapQ10.mafs.gz | wc -l`
+echo $NSITES
+
+#271
+
+#Now we are going to get keep skiptriallelic removed and change minInd to 75% which is 24 individuals. We are also keeping minMapQ at 10
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 10 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 24 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams -GL 1 $FILTERS $TODO -P 1 -out myresult_minMapQ10_minInd24
+
+# how many SNPs?
+NSITES=`zcat myresult_minMapQ10_minInd24.mafs.gz | wc -l`
+echo $NSITES
+
+#373
+
+#Now we are going to get keep skiptriallelic removed and change minInd to 80% which is 25 individuals. We are also keeping minMapQ at 10. Now we are making uniqueOnly set to 0 which means "don't remove reads that have multiple best hits" which is the default
+
+FILTERS="-uniqueOnly 0 -remove_bads 1 -minMapQ 10 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 25 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams -GL 1 $FILTERS $TODO -P 1 -out myresult_uniqueOnly_default
+
+# how many SNPs?
+NSITES=`zcat myresult_uniqueOnly_default.mafs.gz | wc -l`
+echo $NSITES
+
+#271
+
+##############Modeling after Ebel 2015, using very low minInd sharing those sites. Start with 50% and move down from there. Good for interspecific data because there are very few individuals of the same species, so naturally the amount of SNPs shared per those individuals would be lower. this way we can filter out more individuals while still keeping the integrity of the data (at least for the analyses we aim to do). If you have intraspecific data, keep your minInd filters higher (~80%).
+
+#now, modeling after Ebel 2015, we are going to decrease the minInd to 50%!!! So 16 individuals. Keep minMapQ at 10, minQ at 25, and no skipTriallelic. uniqueOnly at 1. Called myresult_minInd16
+
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 10 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 16 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams -GL 1 $FILTERS $TODO -P 1 -out myresult_minInd16
+
+# how many SNPs?
+NSITES=`zcat myresult_minInd16.mafs.gz | wc -l`
+echo $NSITES
+
+#Total number of sites analyzed: 1081908
+#1102
+
+#####This is a good one#####
+######now, modeling after Ebel 2015, we are going to decrease the minInd to 37.5%!!! So 12 individuals. Keep minMapQ at 10, minQ at 25, and no skipTriallelic. uniqueOnly at 1. Called myresult_minInd12
+
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 10 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 12 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams -GL 1 $FILTERS $TODO -P 1 -out myresult_minInd12
+
+# how many SNPs?
+NSITES=`zcat myresult_minInd12.mafs.gz | wc -l`
+echo $NSITES
+
+Total number of sites analyzed: 1081908
+SNPs: 1321
+
+##now, modeling after Ebel 2015, we are going to decrease the minInd to 18.8%!!! So 6 individuals. Keep minMapQ at 10, minQ at 25, and no skipTriallelic. uniqueOnly at 1. Called myresult_minInd6
+
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 10 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 6 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams -GL 1 $FILTERS $TODO -P 1 -out myresult_minInd6
+
+# how many SNPs?
+NSITES=`zcat myresult_minInd6.mafs.gz | wc -l`
+echo $NSITES
+
+Total number of sites analyzed: 1081908
+SNPs: 1372
+
+######Jasmine Playing around Here- trying with minInd = 14
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 10 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 14 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams_de_novo -GL 1 $FILTERS $TODO -P 1 -out myresult_minInd14
+
+# how many SNPs?
+NSITES=`zcat myresult_minInd14.mafs.gz | wc -l`
+echo $NSITES
+Total number of sites analyzed: 1081908
+sites remaining after filtering:
+SNPs: 1216
+
+### now trying minInd=18
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 10 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 18 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams_de_novo -GL 1 $FILTERS $TODO -P 1 -out myresult_minInd18
+
+# how many SNPs?
+NSITES=`zcat myresult_minInd18.mafs.gz | wc -l`
+echo $NSITES
+Total number of sites analyzed: 1081908
+sites remaining after filtering: 979
+SNPs: 980
+
+
+#now trying minInd=4
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 10 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 4 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams_de_novo -GL 1 $FILTERS $TODO -P 1 -out myresult_minInd4
+
+# how many SNPs?
+NSITES=`zcat myresult_minInd4.mafs.gz | wc -l`
+echo $NSITES
+Total number of sites analyzed: 1081908
+sites remaining after filtering: 1371
+SNPs: 1372
+
+#as a thought experiment minInd=2
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 10 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 2 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams_de_novo -GL 1 $FILTERS $TODO -P 1 -out myresult_minInd2
+
+# how many SNPs?
+NSITES=`zcat myresult_minInd2.mafs.gz | wc -l`
+echo $NSITES
+Total number of sites analyzed: 1081908
+sites remaining after filtering: 1371
+SNPs: 1372
+
+
+#as a thought experiment minInd=1
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 10 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 1 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams_de_novo -GL 1 $FILTERS $TODO -P 1 -out myresult_minInd1
+
+# how many SNPs?
+NSITES=`zcat myresult_minInd1.mafs.gz | wc -l`
+echo $NSITES
+Total number of sites analyzed: 1081908
+sites remaining after filtering: 1371
+SNPs: 1372
+
+#as a thought experiment minInd=32
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 10 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 32 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams_de_novo -GL 1 $FILTERS $TODO -P 1 -out myresult_minInd32
+
+# how many SNPs?
+NSITES=`zcat myresult_minInd32.mafs.gz | wc -l`
+echo $NSITES
+Total number of sites analyzed: 1081908
+sites remaining after filtering: 1
+SNPs: 2
+
+#using minInd= 28
+FILTERS="-uniqueOnly 1 -remove_bads 1 -minMapQ 10 -minQ 25 -dosnpstat 1 -doHWE 1 -sb_pval 1e-5 -hetbias_pval 1e-5 -minInd 28 -snp_pval 1e-5 -minMaf 0.05"
+
+TODO="-doMajorMinor 1 -doMaf 1 -doCounts 1 -makeMatrix 1 -doIBS 1 -doCov 1 -doGeno 8 -doBcf 1 -doPost 1 -doGlf 2"
+
+angsd -b bams_de_novo -GL 1 $FILTERS $TODO -P 1 -out
+
+# how many SNPs?
+NSITES=`zcat myresult_minInd28.mafs.gz | wc -l`
+echo $NSITES
+Total number of sites analyzed: 1081908
+sites remaining after filtering: 94
+SNPs: 95
+
+#now we are converting the BCF file produced from minInd=12 to a VCF file
+module load bcftools
+bcftools convert -O v -o myresult_minInd12.vcf myresult_minInd12.bcf
+###needed to use v, uncompressed (not z compressed) in order to run through vcf2phylip
+
+#now convert VCF file to nex format (PHYLIP) using python script vcf2phylip
+module load python3/3.8.10
+
+python vcf2phylip.py --input myresult_minInd12.vcf --phylip-disable --nexus
+# Which is equivalent to:
+python vcf2phylip.py -i myresult_minInd12.vcf -p -n
+# This command will create only a NEXUS matrix called myresult_minInd12.nexus
+
+#see MLminind12.nex to see Maximum Likelihood GTR+I+G model parameters
