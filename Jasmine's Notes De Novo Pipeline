@@ -322,3 +322,4 @@ python vcf2phylip.py -i myresult_minInd12.vcf -p -n
 # This command will create only a NEXUS matrix called myresult_minInd12.nexus
 
 #see MLminind12.nex to see Maximum Likelihood GTR+I+G model parameters
+#will add another nexus file for NJ
