@@ -40,14 +40,15 @@ MATRIX
 END;
 
 BEGIN PAUP;
-outgroup xxxxxx; #####add outgroup identification here
-lset rates=gamma nst=6 rmatrix=estimate pinvar=estimate; #this sets up GTR model, pinvar=estimate means to estimate invariate sites
-lscores 1; #also required for GTR model
+taxset otherspp= 1 3 14-19 21-25 27-32;
+outgroup otherspp;
+lset rates=gamma nst=6 rmatrix=estimate pinvar=estimate;
+lscores 1;
 log start file=ML.log;
 dset distance=logdet;
 set criterion=likelihood;
-hsearch start=stepwise addseq=random nreps=1 swap=TBR; #I am not sure if we should change this, especially the nreps, some people do nreps=100, last time I did 3
+hsearch start=stepwise addseq=random nreps=100 swap=TBR;
 describe/plot=p;
-savetrees file=ML.tre
-savebootp=nodelabels
+savetrees file=ML.tre;
+savebootp=nodelabels;
 END;
